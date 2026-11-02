@@ -574,29 +574,27 @@
   async function loadDemo(){
     try{
       $('optMsg').textContent='加载示例…';
-      const r=await fetch('pictures/floorplan.png');
-      if(!r.ok) throw new Error('未找到 pictures/floorplan.png');
-      const b=await r.blob();
+      const [cr,ir]=await Promise.all([
+        fetch('pictures/example.json',{cache:'no-store'}),
+        fetch('pictures/floorplan.png')
+      ]);
+      if(!cr.ok) throw new Error('未找到 pictures/example.json');
+      if(!ir.ok) throw new Error('未找到 pictures/floorplan.png');
+      const d=normalizeConfig(await cr.json());
+      const b=await ir.blob();
       const dataUrl=await new Promise(res=>{const fr=new FileReader();fr.onload=()=>res(fr.result);fr.readAsDataURL(b);});
       const im=new Image();
       await new Promise((res,rej)=>{im.onload=res; im.onerror=rej; im.src=dataUrl;});
       S.img=im; S.imgW=im.naturalWidth; S.imgH=im.naturalHeight;
-      S.mppW=12; S.mpp=12/S.imgW; S.imgX=0; S.imgY=0;
+      S.mppW=d.mppW; S.mpp=d.mpp; S.imgX=d.imgX; S.imgY=d.imgY;
+      S.cams=d.cams; S.zones=d.zones;
+      nextCam=Math.max(0,...S.cams.map(c=>+String(c.id).replace(/\D/g,'')||0))+1;
+      nextZone=Math.max(0,...S.zones.map(z=>+String(z.id).replace(/\D/g,'')||0))+1;
+      S.selCam=null; S.selZone=null;
       S.planView={zoom:1,panX:0,panY:0};
       S.view={az:-90*D2R, el:55*D2R, dist:Math.max(16, Math.max(S.imgW*S.mpp,S.imgH*S.mpp)*1.35+5), tx:0, ty:0};
-      S.zones=[
-        {id:'z1',name:'会议室',x0:0.8,y0:5.2,w:3.8,h:3.4,color:'#d97706'},
-        {id:'z2',name:'开放办公区',x0:7.8,y0:5.2,w:3.6,h:3.4,color:'#2563eb'},
-        {id:'z3',name:'南侧走廊',x0:0.8,y0:0.4,w:10.6,h:2.4,color:'#059669'}
-      ];
-      S.cams=[
-        {id:'c1',name:'C1 会议',x:0.7,y:8.8,h:3.0,hf:94,vf:49,pw:2560,ph:1440,yaw:-35,pitch:60,roll:0,zoneId:'z1',color:'#2f6fed'},
-        {id:'c2',name:'C2 办公',x:11.4,y:8.8,h:3.0,hf:94,vf:49,pw:2560,ph:1440,yaw:215,pitch:60,roll:0,zoneId:'z2',color:'#2f9e6e'},
-        {id:'c3',name:'C3 南侧西',x:0.7,y:0.7,h:2.5,hf:94,vf:49,pw:2560,ph:1440,yaw:35,pitch:60,roll:0,zoneId:'z3',color:'#e07b39'},
-        {id:'c4',name:'C4 南侧东',x:11.4,y:0.7,h:2.5,hf:94,vf:49,pw:2560,ph:1440,yaw:145,pitch:60,roll:0,zoneId:'z3',color:'#9b59b6'}
-      ];
-      nextZone=4; nextCam=5; S.selCam=null; S.selZone=null;
-      $('mppW').value=12; $('mpp').value=S.mpp.toFixed(4); $('imgX').value=0; $('imgY').value=0;
+      $('mppW').value=S.mppW; $('mpp').value=(+S.mpp).toFixed(4);
+      $('imgX').value=S.imgX; $('imgY').value=S.imgY;
       $('imgInfo').textContent='示例底图 · '+S.imgW+'×'+S.imgH+'px';
       dbSet('plan',{dataUrl,w:S.imgW,h:S.imgH,name:'示例底图'});
       saveState(); renderLists(); renderForms(); drawAll();
