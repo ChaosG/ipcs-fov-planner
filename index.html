@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>多相机监控规划器</title>
+<link rel="stylesheet" href="assets/planner.css?v=5">
+</head>
+<body>
+<header>
+  <h1>多相机监控规划器</h1>
+  <p>载入户型图 → 放置相机与监控区 → 自动分配、自动寻优，查看覆盖与盲区。3D：左键旋转、右键/Shift+左键平移、滚轮缩放。</p>
+  <a class="navlink" href="simulator.html">单相机模拟器 →</a>
+</header>
+
+<div class="app">
+  <aside class="panel">
+    <section>
+      <h2>底图</h2>
+      <label class="file">选择平面图<input id="file" type="file" accept="image/*"></label>
+      <div class="row2">
+        <label>图宽实际长度 (m)<input id="mppW" type="number" step="0.1" value="14.5"></label>
+        <label>比例 m/px<input id="mpp" type="number" step="0.001" value="0.0119" readonly></label>
+      </div>
+      <div class="row2">
+        <label>底图 X 偏移 (m)<input id="imgX" type="number" step="0.1" value="0"></label>
+        <label>底图 Y 偏移 (m)<input id="imgY" type="number" step="0.1" value="0"></label>
+      </div>
+      <div class="hint" id="imgInfo">未载入底图</div>
+    </section>
+
+    <section>
+      <h2>监控区</h2>
+      <div class="btns">
+        <button id="addZone" class="primary">＋ 画监控区</button>
+        <button id="delZone">删除选中</button>
+      </div>
+      <div id="zoneList" class="list"></div>
+      <div id="zoneForm" class="form hidden"></div>
+    </section>
+
+    <section>
+      <h2>相机</h2>
+      <div class="btns">
+        <button id="addCam" class="primary">＋ 放相机</button>
+        <button id="delCam">删除选中</button>
+      </div>
+      <div id="camList" class="list"></div>
+      <div id="camForm" class="form hidden"></div>
+    </section>
+
+    <section>
+      <h2>计算</h2>
+      <div class="btns">
+        <button id="autoAssign">自动分配区</button>
+        <button id="optimize" class="accent">自动寻优</button>
+      </div>
+      <div class="hint" id="optMsg"></div>
+    </section>
+
+    <section>
+      <h2>配置</h2>
+      <div class="btns">
+        <button id="demoBtn" class="primary">加载示例</button>
+        <button id="exportCfg">导出配置</button>
+        <button id="exportList">导出配置单</button>
+        <label class="filebtn">导入配置<input id="importCfg" type="file" accept="application/json,.json"></label>
+      </div>
+      <div class="hint">导出为 JSON（含底图）；导入会覆盖当前相机、监控区和底图。</div>
+    </section>
+
+    <details class="help" open>
+      <summary>操作说明</summary>
+      <ul>
+        <li>底图：选择图片后填「图宽实际长度」，网格 1 m / 5 m；X/Y 偏移把底图左下角放到世界坐标的指定位置。</li>
+        <li>监控区：点「＋ 画监控区」，在平面图上拖出矩形。</li>
+        <li>相机：点「＋ 放相机」，在平面图上点击放置；拖动相机点可移动，或改 X/Y 坐标。</li>
+        <li>选中：点平面图上的相机/区，或点左侧列表；选中后可改参数或删除。</li>
+        <li>3D：左键旋转、右键/Shift+左键平移、滚轮缩放；右上角「重置视角」。</li>
+        <li>计算：先「自动分配区」，再「自动寻优」。</li>
+      </ul>
+    </details>
+  </aside>
+
+  <main>
+    <div class="card view3d">
+      <canvas id="c3d"></canvas>
+      <div class="badge" id="badge">3D · 方位 45° · 仰角 45°</div>
+      <button id="resetView" class="viewbtn">重置视角</button>
+    </div>
+    <div class="row">
+      <div class="card plan">
+        <canvas id="cplan"></canvas>
+        <div class="badge" id="planBadge">平面 · 左键放置/拖动 · 右键平移 · 滚轮缩放</div>
+        <button id="resetPlan" class="viewbtn">重置</button>
+      </div>
+      <div class="card metrics" id="metrics"></div>
+    </div>
+  </main>
+</div>
+
+<script src="assets/planner.js?v=30"></script>
+</body>
+</html>

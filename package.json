@@ -1,0 +1,11 @@
+{
+  "name": "ipcs-fov-planner",
+  "version": "1.0.0",
+  "private": true,
+  "description": "本地优先的 3D 摄像头覆盖规划器：四棱锥视界、像素密度、监控区自动寻优",
+  "scripts": {
+    "start": "python3 -m http.server 8080",
+    "serve": "npx serve ."
+  },
+  "license": "MIT"
+}

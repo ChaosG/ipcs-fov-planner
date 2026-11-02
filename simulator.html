@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>摄像头视界模拟器</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<header>
+  <h1>摄像头视界模拟器</h1>
+  <p>输入视场角、分辨率、安装高度、俯仰与旋转，实时查看四棱锥视界在地面的覆盖范围与像素密度。</p>
+  <a class="navlink" href="index.html">多相机规划器 →</a>
+</header>
+
+<div class="app">
+  <aside class="panel">
+    <h2>镜头与安装</h2>
+    <div class="presets">
+      <button data-h="94" data-v="49" data-w="2560" data-hh="1440">2.8 mm</button>
+      <button data-h="70" data-v="35" data-w="2560" data-hh="1440">4 mm</button>
+      <button data-h="46" data-v="24" data-w="2560" data-hh="1440">6 mm</button>
+      <button data-h="43" data-v="24" data-w="2560" data-hh="1440">8 mm</button>
+    </div>
+    <button id="resetBtn" class="reset">恢复默认参数</button>
+
+    <div class="field">
+      <div class="top"><label for="hf">水平视场角 H</label><span class="val"><span id="hfV">94</span>°</span></div>
+      <input id="hf" type="range" min="10" max="150" step="0.5" value="94">
+      <input id="hfN" type="number" min="10" max="150" step="0.1" value="94">
+    </div>
+    <div class="field">
+      <div class="top"><label for="vf">垂直视场角 V</label><span class="val"><span id="vfV">49</span>°</span></div>
+      <input id="vf" type="range" min="5" max="120" step="0.5" value="49">
+      <input id="vfN" type="number" min="5" max="120" step="0.1" value="49">
+    </div>
+    <div class="field">
+      <div class="top"><label>分辨率 宽 × 高</label><span class="val" id="resV">2560×1440 · 3.69 MP</span></div>
+      <input id="pw" type="range" min="320" max="4096" step="16" value="2560">
+      <input id="ph" type="range" min="240" max="2160" step="8" value="1440">
+      <div class="resnums">
+        <input id="pwN" type="number" min="320" max="4096" step="1" value="2560">
+        <span class="x">×</span>
+        <input id="phN" type="number" min="240" max="2160" step="1" value="1440">
+        <span class="pix" id="resPix">3,686,400 像素</span>
+      </div>
+    </div>
+    <div class="field">
+      <div class="top"><label for="hh">安装高度</label><span class="val"><span id="hhV">5.0</span> m</span></div>
+      <input id="hh" type="range" min="1" max="20" step="0.1" value="5">
+      <input id="hhN" type="number" min="1" max="20" step="0.1" value="5">
+    </div>
+    <div class="field">
+      <div class="top"><label for="pt">俯仰角（向下）</label><span class="val"><span id="ptV">90</span>°</span></div>
+      <input id="pt" type="range" min="0" max="90" step="0.5" value="90">
+      <input id="ptN" type="number" min="0" max="90" step="0.1" value="90">
+    </div>
+    <div class="field">
+      <div class="top"><label for="yw">水平旋转（偏航）</label><span class="val"><span id="ywV">0</span>°</span></div>
+      <input id="yw" type="range" min="0" max="360" step="1" value="0">
+      <input id="ywN" type="number" min="0" max="360" step="0.5" value="0">
+    </div>
+    <div class="field">
+      <div class="top"><label for="rl">绕光轴旋转（滚转）</label><span class="val"><span id="rlV">90</span>°</span></div>
+      <input id="rl" type="range" min="0" max="360" step="1" value="90">
+      <input id="rlN" type="number" min="0" max="360" step="1" value="90">
+    </div>
+    <div class="field">
+      <div class="top">
+        <label>监控范围（地面矩形）</label>
+        <label class="chk"><input id="zoneOn" type="checkbox" checked> 显示</label>
+      </div>
+      <div class="grid2">
+        <input id="zx" type="number" step="0.5" value="0" placeholder="X 起点">
+        <input id="zy" type="number" step="0.5" value="0" placeholder="Y 起点">
+        <input id="zl" type="number" step="0.5" value="8" placeholder="长（X）">
+        <input id="zw" type="number" step="0.5" value="4" placeholder="宽（Y）">
+      </div>
+      <div class="hint">顺序：X 起点、Y 起点、长（X）、宽（Y）；也可以在平面图上按住拖动直接框选。</div>
+      <div class="optrow">
+        <button id="optBtn">自动求最优</button>
+        <span id="optResult"></span>
+      </div>
+    </div>
+    <div class="hint">3D：左键旋转、右键/Shift+左键平移、滚轮缩放。俯仰角从水平面起算，90° 为垂直向下；偏航从 +X 轴逆时针；滚转绕视界中心线旋转。</div>
+  </aside>
+
+  <main>
+    <div class="card view3d">
+      <canvas id="c3d"></canvas>
+      <div class="badge">3D 视界（四棱锥）<span class="angs" id="viewAng"></span></div>
+    </div>
+    <div class="row">
+      <div class="card plan"><canvas id="cplan"></canvas></div>
+      <div class="card metrics">
+        <h3>覆盖指标</h3>
+        <div class="kpis">
+          <div class="kpi"><div class="k">近端</div><div class="v" id="kNear">–</div></div>
+          <div class="kpi"><div class="k">远端</div><div class="v" id="kFar">–</div></div>
+          <div class="kpi"><div class="k">地面足迹</div><div class="v" id="kArea">–</div></div>
+          <div class="kpi"><div class="k">250 px/m 距离</div><div class="v" id="kId">–</div></div>
+          <div class="kpi"><div class="k">监控范围内覆盖</div><div class="v" id="kZone">–</div></div>
+          <div class="kpi"><div class="k">视界落在监控范围内</div><div class="v" id="kRatio">–</div></div>
+        </div>
+        <div class="warn" id="warn"></div>
+        <table>
+          <thead><tr><th>地面距离</th><th>像素密度</th><th>等级</th></tr></thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+</div>
+<script src="assets/app.js?v=3"></script>
+</body>
+</html>
