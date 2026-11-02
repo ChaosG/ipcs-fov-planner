@@ -4,6 +4,8 @@
   const {sub,dot,cross,norm}=vec;
   const esc = s => String(s ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
   const safeColor = (v, d='#2f6fed') => /^#[0-9a-f]{6}$/i.test(String(v||'')) ? v : d;
+  const wrap180 = a => { a=+a||0; return ((a+180)%360+360)%360-180; };
+  const wrap90 = a => { a=wrap180(a); if(a>90) a-=180; if(a<-90) a+=180; return a; };
   const LENS = { '2.8':[94,49], '4':[70,35], '6':[46,24], '8':[43,24] };
   const COLORS = ['#2f6fed','#e07b39','#2f9e6e','#9b59b6','#c0392b','#16a085','#d4a017','#5d6d7e'];
 
@@ -33,7 +35,8 @@
       const o=JSON.parse(localStorage.getItem('planner_v4')||'null');
       if(!o) return;
       S.mpp=o.mpp||S.mpp; S.mppW=o.mppW||S.mppW; S.imgX=+o.imgX||0; S.imgY=+o.imgY||0;
-      S.cams=o.cams||[]; S.zones=o.zones||[];
+      S.cams=(o.cams||[]).map(c=>({...c, yaw:wrap180(c.yaw), roll:wrap90(c.roll)}));
+      S.zones=o.zones||[];
       nextCam=o.nextCam||S.cams.length+1; nextZone=o.nextZone||S.zones.length+1;
     }catch(e){}
   }
@@ -337,11 +340,11 @@
         <label>X 坐标 m<input data-k="x" type="number" step="0.1" value="${c.x.toFixed(2)}"></label>
         <label>Y 坐标 m<input data-k="y" type="number" step="0.1" value="${c.y.toFixed(2)}"></label>
         <label>高度 m<input data-k="h" type="number" step="0.1" value="${c.h}"></label>
-        <label>偏航°<input data-k="yaw" type="number" step="1" value="${c.yaw}"></label>
+        <label>偏航°<input data-k="yaw" type="number" step="1" min="-180" max="180" value="${c.yaw}"></label>
         <label>水平 H°<input data-k="hf" type="number" step="0.5" value="${c.hf}"></label>
         <label>俯仰°<input data-k="pitch" type="number" step="0.5" value="${c.pitch}"></label>
         <label>垂直 V°<input data-k="vf" type="number" step="0.5" value="${c.vf}"></label>
-        <label>滚转°<input data-k="roll" type="number" step="1" value="${c.roll}"></label>
+        <label>滚转°<input data-k="roll" type="number" step="1" min="-90" max="90" value="${c.roll}"></label>
         <label>宽 px<input data-k="pw" type="number" step="16" value="${c.pw}"></label>
         <label>高 px<input data-k="ph" type="number" step="8" value="${c.ph}"></label>
         <label>颜色<input data-k="color" type="color" value="${safeColor(c.color)}"></label>
@@ -352,6 +355,8 @@
         inp.oninput=()=>{
           const k=inp.dataset.k;
           if(k==='hidden') c.hidden=inp.checked;
+          else if(k==='yaw') c[k]=wrap180(inp.value);
+          else if(k==='roll') c[k]=wrap90(inp.value);
           else c[k]= (k==='name'||k==='zoneId'||k==='color') ? inp.value : (+inp.value||0);
           if((k==='hf'||k==='vf') && c.lens && c.lens!=='custom'){
             const l=LENS[c.lens];
@@ -458,9 +463,9 @@
         (Math.abs(t.cov-b.cov)<=1e-6 && t.ratio>b.ratio+1e-9);
       // 粗扫：记录所有可行姿态
       const all=[];
-      for(let yaw=0;yaw<360;yaw+=6)
+      for(let yaw=-180;yaw<180;yaw+=6)
         for(let pitch=1;pitch<=89;pitch+=2.5)
-          for(let roll=0;roll<360;roll+=15){
+          for(let roll=-90;roll<=90;roll+=15){
             const t=test(yaw,pitch,roll); if(!t) continue;
             all.push({yaw,pitch,roll,...t});
           }
@@ -490,9 +495,9 @@
         }
       }
       if(best){
-        c.yaw=((best.yaw%360)+360)%360;
+        c.yaw=wrap180(best.yaw);
         c.pitch=best.pitch;
-        c.roll=((best.roll%360)+360)%360;
+        c.roll=wrap90(best.roll);
         saveState(); renderLists(); renderForms(); drawAll();
         $('optMsg').textContent=`已优化「${c.name}」：覆盖 ${(best.cov*100).toFixed(0)}% · 视界利用率 ${(best.ratio*100).toFixed(0)}%`;
       } else {
@@ -734,7 +739,7 @@
         x:num(c.x,-1e4,1e4,0), y:num(c.y,-1e4,1e4,0), h:num(c.h,0.3,50,3),
         hf:num(c.hf,5,170,70), vf:num(c.vf,3,150,35),
         pw:Math.round(num(c.pw,320,8192,2560)), ph:Math.round(num(c.ph,240,4320,1440)),
-        yaw:num(c.yaw,-720,720,0), pitch:num(c.pitch,0,90,30), roll:num(c.roll,-720,720,0),
+        yaw:wrap180(num(c.yaw,-720,720,0)), pitch:num(c.pitch,0,90,30), roll:wrap90(num(c.roll,-720,720,0)),
         zoneId:zids.has(zid)?zid:'auto', color:safeColor(c.color), hidden:!!c.hidden,
         lens:['2.8','4','6','8','custom'].includes(String(c.lens))?String(c.lens):undefined};
     });
