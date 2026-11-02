@@ -80,6 +80,7 @@ ipcs-fov-planner/
 ├── planner.html        # 兼容旧链接的跳转页
 ├── assets/
 │   ├── planner.css / planner.js
+│   ├── geometry.js     # 公共几何/投影（两页共用）
 │   └── style.css / app.js
 ├── docs/               # README 截图
 ├── pictures/           # 示例户型图

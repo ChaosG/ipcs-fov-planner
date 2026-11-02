@@ -1,6 +1,7 @@
 (() => {
   const $ = id => document.getElementById(id);
-  const D2R = Math.PI/180, R2D = 180/Math.PI;
+  const {D2R,R2D,vec}=Geo;
+  const {sub,dot,cross,norm}=vec;
 
   const S = {
     hf:94, vf:49, pw:2560, ph:1440, hh:5, pt:90, yw:0, roll:90,
@@ -40,17 +41,8 @@
 
   // ---------- 几何 ----------
   function geometry(){
-    const h=S.hh, th=S.pt*D2R, ph=S.yw*D2R, rl=S.roll*D2R;
-    const aH=S.hf/2*D2R, aV=S.vf/2*D2R;
-    const tH=Math.tan(aH), tV=Math.tan(aV);
-    const axis=[Math.cos(th)*Math.cos(ph), Math.cos(th)*Math.sin(ph), -Math.sin(th)];
-    let right=[-Math.sin(ph), Math.cos(ph), 0];
-    let up=[Math.sin(th)*Math.cos(ph), Math.sin(th)*Math.sin(ph), Math.cos(th)];
-    // 绕光轴滚转
-    const cr=Math.cos(rl), sr=Math.sin(rl);
-    const r2=[right[0]*cr+up[0]*sr, right[1]*cr+up[1]*sr, right[2]*cr+up[2]*sr];
-    const u2=[-right[0]*sr+up[0]*cr, -right[1]*sr+up[1]*cr, -right[2]*sr+up[2]*cr];
-    right=r2; up=u2;
+    const h=S.hh;
+    const {axis,right,up,tH,tV,th,ph}=Geo.basis({hf:S.hf,vf:S.vf,yaw:S.yw,pitch:S.pt,roll:S.roll});
     const rays=[]; const pts=[]; let valid=true;
     for (const v of [-1,1]) for (const u of [-1,1]) {
       const d=[axis[0]+u*tH*right[0]+v*tV*up[0],
@@ -96,10 +88,7 @@
     return {h,th,ph,axis,right,up,rays,poly,valid,near,far,nearPt,farPt,area,apex:[0,0,h]};
   }
 
-  const ppf = (dist) => { // dist: 地面距离
-    const slant=Math.hypot(dist,S.hh);
-    return S.pw/(2*slant*Math.tan(S.hf/2*D2R));
-  };
+  const ppf = (dist) => Geo.ppf(S.pw,S.hf,S.hh,dist); // dist: 地面距离
   const distFor = (target) => { // 达到某 px/m 的地面距离；不可达返回 null
     const slant=S.pw/(2*target*Math.tan(S.hf/2*D2R));
     return slant>S.hh+1e-6 ? Math.sqrt(slant*slant-S.hh*S.hh) : null;
@@ -108,63 +97,12 @@
 
   // ---------- 监控范围矩形 ----------
   const zoneRect = () => [S.zone.x0,S.zone.y0,S.zone.x1,S.zone.y1];
-  function polyArea(p){
-    let a=0;
-    for(let i=0;i<p.length;i++){const q=p[(i+1)%p.length]; a+=p[i][0]*q[1]-q[0]*p[i][1];}
-    return Math.abs(a)/2;
-  }
-  function clipPoly(poly,rect){
-    const [x0,y0,x1,y1]=rect;
-    const clip=(pts,inside,inter)=>{
-      const out=[];
-      for(let i=0;i<pts.length;i++){
-        const a=pts[i], b=pts[(i+1)%pts.length];
-        const ia=inside(a), ib=inside(b);
-        if(ia) out.push(a);
-        if(ia!==ib) out.push(inter(a,b));
-      }
-      return out;
-    };
-    let p=poly;
-    p=clip(p, q=>q[0]>=x0, (a,b)=>[x0, a[1]+(x0-a[0])/(b[0]-a[0])*(b[1]-a[1])]);
-    p=clip(p, q=>q[0]<=x1, (a,b)=>[x1, a[1]+(x1-a[0])/(b[0]-a[0])*(b[1]-a[1])]);
-    p=clip(p, q=>q[1]>=y0, (a,b)=>[a[0]+(y0-a[1])/(b[1]-a[1])*(b[0]-a[0]), y0]);
-    p=clip(p, q=>q[1]<=y1, (a,b)=>[a[0]+(y1-a[1])/(b[1]-a[1])*(b[0]-a[0]), y1]);
-    return p;
-  }
+  const {clipPoly,polyArea,insideConvex}=Geo;
   const zoneInter = g => g.valid ? clipPoly(g.poly, zoneRect()) : [];
 
   function footprintFor(yawDeg,pitchDeg,rollDeg){
-    const h=S.hh, th=pitchDeg*D2R, ph=yawDeg*D2R, rl=(rollDeg===undefined?S.roll:rollDeg)*D2R;
-    const tH=Math.tan(S.hf/2*D2R), tV=Math.tan(S.vf/2*D2R);
-    const axis=[Math.cos(th)*Math.cos(ph), Math.cos(th)*Math.sin(ph), -Math.sin(th)];
-    let right=[-Math.sin(ph), Math.cos(ph), 0];
-    let up=[Math.sin(th)*Math.cos(ph), Math.sin(th)*Math.sin(ph), Math.cos(th)];
-    const cr=Math.cos(rl), sr=Math.sin(rl);
-    const r2=[right[0]*cr+up[0]*sr, right[1]*cr+up[1]*sr, right[2]*cr+up[2]*sr];
-    const u2=[-right[0]*sr+up[0]*cr, -right[1]*sr+up[1]*cr, -right[2]*sr+up[2]*cr];
-    right=r2; up=u2;
-    const pts=[];
-    for (const v of [-1,1]) for (const u of [-1,1]) {
-      const d=[axis[0]+u*tH*right[0]+v*tV*up[0],
-               axis[1]+u*tH*right[1]+v*tV*up[1],
-               axis[2]+u*tH*right[2]+v*tV*up[2]];
-      if (d[2] >= -1e-6) return null;
-      const t=h/(-d[2]);
-      pts.push([d[0]*t,d[1]*t]);
-    }
-    return [pts[0],pts[1],pts[3],pts[2]];
-  }
-  function insideConvex(poly,p){
-    let sign=0;
-    for(let i=0;i<poly.length;i++){
-      const a=poly[i], b=poly[(i+1)%poly.length];
-      const cr=(b[0]-a[0])*(p[1]-a[1])-(b[1]-a[1])*(p[0]-a[0]);
-      if(Math.abs(cr)<1e-9) continue;
-      const s=cr>0?1:-1;
-      if(sign===0) sign=s; else if(s!==sign) return false;
-    }
-    return true;
+    return Geo.footprint({x:0,y:0,h:S.hh,hf:S.hf,vf:S.vf,
+      yaw:yawDeg,pitch:pitchDeg,roll:rollDeg===undefined?S.roll:rollDeg}, -1e-6);
   }
   function setParams(yaw,pitch,roll){
     yaw=((yaw%360)+360)%360; roll=((roll%360)+360)%360;
@@ -240,10 +178,6 @@
     c3d.width=Math.round(W3*DPR); c3d.height=Math.round(H3*DPR);
     x3.setTransform(DPR,0,0,DPR,0,0);
   }
-  const sub=(a,b)=>[a[0]-b[0],a[1]-b[1],a[2]-b[2]];
-  const dot=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
-  const cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];
-  const norm=a=>{const l=Math.hypot(...a)||1;return [a[0]/l,a[1]/l,a[2]/l];};
 
   function cameraBasis(){
     const {az,el,dist}=S.view;
@@ -259,13 +193,9 @@
     return {eye,fwd,right,up,target};
   }
   function projector(){
-    const {eye,fwd,right,up}=cameraBasis();
-    const f=0.5*H3/Math.tan(45*D2R/2);
-    return p=>{
-      const v=sub(p,eye), z=dot(v,fwd);
-      if (z<0.15) return null;
-      return [W3/2 + f*dot(v,right)/z, H3/2 - f*dot(v,up)/z, z];
-    };
+    const {az,el,dist}=S.view;
+    const target=[S.view.target[0]+(S.view.tx||0),S.view.target[1]+(S.view.ty||0),S.view.target[2]];
+    return Geo.makeProjector({w:W3,h:H3,target,az,el,dist,nearZ:0.15,withDepth:true});
   }
 
   function draw3D(){

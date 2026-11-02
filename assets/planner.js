@@ -1,6 +1,7 @@
 (() => {
   const $ = id => document.getElementById(id);
-  const D2R = Math.PI/180, R2D = 180/Math.PI;
+  const {D2R,R2D,vec}=Geo;
+  const {sub,dot,cross,norm}=vec;
   const esc = s => String(s ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
   const safeColor = (v, d='#2f6fed') => /^#[0-9a-f]{6}$/i.test(String(v||'')) ? v : d;
   const LENS = { '2.8':[94,49], '4':[70,35], '6':[46,24], '8':[43,24] };
@@ -16,64 +17,10 @@
   };
   let nextCam=1, nextZone=1;
 
-  // ---------- 几何 ----------
-  function footprint(c){
-    const th=c.pitch*D2R, ph=c.yaw*D2R, rl=c.roll*D2R;
-    const tH=Math.tan(c.hf/2*D2R), tV=Math.tan(c.vf/2*D2R);
-    const axis=[Math.cos(th)*Math.cos(ph), Math.cos(th)*Math.sin(ph), -Math.sin(th)];
-    const r0=[-Math.sin(ph), Math.cos(ph), 0];
-    const u0=[Math.sin(th)*Math.cos(ph), Math.sin(th)*Math.sin(ph), Math.cos(th)];
-    const cr=Math.cos(rl), sr=Math.sin(rl);
-    const right=[r0[0]*cr+u0[0]*sr, r0[1]*cr+u0[1]*sr, r0[2]*cr+u0[2]*sr];
-    const up=[-r0[0]*sr+u0[0]*cr, -r0[1]*sr+u0[1]*cr, -r0[2]*sr+u0[2]*cr];
-    const pts=[];
-    for(const v of [-1,1]) for(const u of [-1,1]){
-      const d=[axis[0]+u*tH*right[0]+v*tV*up[0],
-               axis[1]+u*tH*right[1]+v*tV*up[1],
-               axis[2]+u*tH*right[2]+v*tV*up[2]];
-      if(d[2]>=-1e-9) return null;
-      const t=c.h/(-d[2]);
-      pts.push([c.x+d[0]*t, c.y+d[1]*t]);
-    }
-    return [pts[0],pts[1],pts[3],pts[2]];
-  }
-  function insideConvex(poly,p){
-    let sign=0;
-    for(let i=0;i<poly.length;i++){
-      const a=poly[i], b=poly[(i+1)%poly.length];
-      const cr=(b[0]-a[0])*(p[1]-a[1])-(b[1]-a[1])*(p[0]-a[0]);
-      if(Math.abs(cr)<1e-9) continue;
-      const s=cr>0?1:-1;
-      if(sign===0) sign=s; else if(s!==sign) return false;
-    }
-    return true;
-  }
-  function clipPoly(poly,rect){
-    const [x0,y0,x1,y1]=rect;
-    const clip=(pts,ins,it)=>{
-      const out=[];
-      for(let i=0;i<pts.length;i++){
-        const a=pts[i], b=pts[(i+1)%pts.length];
-        const ia=ins(a), ib=ins(b);
-        if(ia) out.push(a);
-        if(ia!==ib) out.push(it(a,b));
-      }
-      return out;
-    };
-    let p=poly;
-    p=clip(p,q=>q[0]>=x0,(a,b)=>[x0,a[1]+(x0-a[0])/(b[0]-a[0])*(b[1]-a[1])]);
-    p=clip(p,q=>q[0]<=x1,(a,b)=>[x1,a[1]+(x1-a[0])/(b[0]-a[0])*(b[1]-a[1])]);
-    p=clip(p,q=>q[1]>=y0,(a,b)=>[a[0]+(y0-a[1])/(b[1]-a[1])*(b[0]-a[0]),y0]);
-    p=clip(p,q=>q[1]<=y1,(a,b)=>[a[0]+(y1-a[1])/(b[1]-a[1])*(b[0]-a[0]),y1]);
-    return p;
-  }
-  function polyArea(p){
-    let a=0;
-    for(let i=0;i<p.length;i++){const q=p[(i+1)%p.length]; a+=p[i][0]*q[1]-q[0]*p[i][1];}
-    return Math.abs(a)/2;
-  }
+  // ---------- 几何（公共实现见 geometry.js） ----------
+  const {footprint,insideConvex,clipPoly,polyArea}=Geo;
   const zoneRect = z => [z.x0,z.y0,z.x0+z.w,z.y0+z.h];
-  const camPPF = (c,d) => c.pw/(2*Math.hypot(d,c.h)*Math.tan(c.hf/2*D2R));
+  const camPPF = (c,d) => Geo.ppf(c.pw,c.hf,c.h,d);
 
   // ---------- 持久化 ----------
   function saveState(){
@@ -122,24 +69,9 @@
     c3d.width=Math.round(W3*DPR); c3d.height=Math.round(H3*DPR);
     x3.setTransform(DPR,0,0,DPR,0,0);
   }
-  const sub=(a,b)=>[a[0]-b[0],a[1]-b[1],a[2]-b[2]];
-  const dot=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
-  const cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];
-  const norm=a=>{const l=Math.hypot(...a)||1;return [a[0]/l,a[1]/l,a[2]/l];};
   function projector(){
     const t=target(), {az,el,dist}=S.view;
-    const eye=[t[0]+dist*Math.cos(el)*Math.cos(az), t[1]+dist*Math.cos(el)*Math.sin(az), t[2]+dist*Math.sin(el)];
-    const fwd=norm(sub(t,eye));
-    let right=cross(fwd,[0,0,1]);
-    if(Math.hypot(right[0],right[1],right[2])<1e-6) right=[1,0,0];
-    right=norm(right);
-    const up=cross(right,fwd);
-    const f=0.5*H3/Math.tan(45*D2R/2);
-    return p=>{
-      const v=sub(p,eye), z=dot(v,fwd);
-      if(z<0.2) return null;
-      return [W3/2+f*dot(v,right)/z, H3/2-f*dot(v,up)/z];
-    };
+    return Geo.makeProjector({w:W3,h:H3,target:t,az,el,dist,nearZ:0.2});
   }
   function drawTri(img,sx0,sy0,sx1,sy1,sx2,sy2,p0,p1,p2){
     const det=(sx1-sx0)*(sy2-sy0)-(sx2-sx0)*(sy1-sy0);
