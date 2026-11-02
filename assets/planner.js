@@ -261,6 +261,9 @@
     const pad=1.5;
     const base=Math.min(WP/(Wm+pad*2), HP/(Hm+pad*2));
     const pv=S.planView||{zoom:1,panX:0,panY:0};
+    if(!Number.isFinite(pv.zoom)||pv.zoom<=0) pv.zoom=1;
+    if(!Number.isFinite(pv.panX)) pv.panX=0;
+    if(!Number.isFinite(pv.panY)) pv.panY=0;
     const s=base*pv.zoom;
     const cx=WP/2+pv.panX, cy=HP/2+pv.panY;
     const T=(x,y)=>[cx+(x-cX)*s, cy-(y-cY)*s];
@@ -823,14 +826,14 @@
     if(!planT) return;
     const r=cp.getBoundingClientRect();
     const mx=e.clientX-r.left, my=e.clientY-r.top;
-    const {s,cx,cy,Wm,Hm}=planT;
-    const wx=Wm/2+(mx-cx)/s, wy=Hm/2-(my-cy)/s;
+    const {s,cx,cy,cX,cY}=planT;
+    const wx=cX+(mx-cx)/s, wy=cY-(my-cy)/s;
     const pv=S.planView;
     const z=Math.max(0.35,Math.min(12,pv.zoom*(1-Math.sign(e.deltaY)*0.12)));
     const base=s/pv.zoom, s2=base*z;
     pv.zoom=z;
-    pv.panX=mx-WP/2-(wx-Wm/2)*s2;
-    pv.panY=my-HP/2+(wy-Hm/2)*s2;
+    pv.panX=mx-WP/2-(wx-cX)*s2;
+    pv.panY=my-HP/2+(wy-cY)*s2;
     drawPlan();
   },{passive:false});
   cp.addEventListener('contextmenu',e=>e.preventDefault());
