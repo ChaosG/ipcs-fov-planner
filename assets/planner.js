@@ -128,6 +128,7 @@
     }
     // 区
     for(const z of S.zones){
+      if(z.hidden) continue;
       const r=zoneRect(z);
       const pts=[[r[0],r[1]],[r[2],r[1]],[r[2],r[3]],[r[0],r[3]]].map(p=>pr([p[0],p[1],0]));
       if(!pts.every(Boolean)) continue;
@@ -137,6 +138,7 @@
     }
     // 足迹
     for(const c of S.cams){
+      if(c.hidden) continue;
       const fp=footprint(c); if(!fp) continue;
       const pts=fp.map(p=>pr([p[0],p[1],0]));
       if(!pts.every(Boolean)) continue;
@@ -146,6 +148,7 @@
     }
     // 四棱锥：4 条棱 + 侧面
     for(const c of S.cams){
+      if(c.hidden) continue;
       const fp=footprint(c); if(!fp) continue;
       const apex=pr([c.x,c.y,c.h]);
       const pts=fp.map(p=>pr([p[0],p[1],0]));
@@ -162,6 +165,7 @@
     }
     // 相机
     for(const c of S.cams){
+      if(c.hidden) continue;
       const b=pr([c.x,c.y,0]), t=pr([c.x,c.y,c.h]);
       if(b&&t){
         x3.setLineDash([3,3]); x3.strokeStyle='#94a3b8'; x3.lineWidth=1.2;
@@ -245,6 +249,7 @@
     }
     // 区
     for(const z of S.zones){
+      if(z.hidden) continue;
       const r=zoneRect(z);
       const a=T(r[0],r[3]), b=T(r[2],r[1]);
       xp.fillStyle='rgba(245,158,11,.10)';
@@ -256,6 +261,7 @@
     }
     // 足迹
     for(const c of S.cams){
+      if(c.hidden) continue;
       const fp=footprint(c); if(!fp) continue;
       const pts=fp.map(p=>T(p[0],p[1]));
       xp.beginPath(); pts.forEach((p,i)=>i?xp.lineTo(p[0],p[1]):xp.moveTo(p[0],p[1])); xp.closePath();
@@ -264,6 +270,7 @@
     }
     // 相机
     for(const c of S.cams){
+      if(c.hidden) continue;
       const p=T(c.x,c.y);
       xp.beginPath(); xp.arc(p[0],p[1],6,0,7); xp.fillStyle=c.color; xp.fill();
       if(S.selCam===c.id){ xp.beginPath(); xp.arc(p[0],p[1],10,0,7); xp.strokeStyle=c.color; xp.lineWidth=2; xp.stroke(); }
@@ -278,26 +285,34 @@
   }
 
   // ---------- 列表与表单 ----------
+  const eyeSVG = off => off
+    ? '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 3l18 18"/><path d="M10.6 5.1A10.9 10.9 0 0 1 12 5c5 0 9 4.5 9 7a11.8 11.8 0 0 1-2.2 3.2M6.2 6.2A11.6 11.6 0 0 0 3 12c0 2.5 4 7 9 7a10.9 10.9 0 0 0 4.1-.8"/></svg>'
+    : '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>';
+
   function renderLists(){
     const zl=$('zoneList'); zl.innerHTML='';
     for(const z of S.zones){
       const el=document.createElement('div');
-      el.className='item'+(S.selZone===z.id?' sel':'');
-      el.innerHTML=`<span class="dot" style="background:${safeColor(z.color,'#d97706')}"></span><span class="nm">${esc(z.name)}</span><span class="sub">${(+z.w).toFixed(2)}×${(+z.h).toFixed(2)} m</span>`;
+      el.className='item'+(S.selZone===z.id?' sel':'')+(z.hidden?' off':'');
+      el.innerHTML=`<span class="dot" style="background:${safeColor(z.color,'#d97706')}"></span><span class="nm">${esc(z.name)}</span><span class="sub">${(+z.w).toFixed(2)}×${(+z.h).toFixed(2)} m</span><button class="eye${z.hidden?' off':''}" title="${z.hidden?'显示':'隐藏'}" aria-label="${z.hidden?'显示':'隐藏'}">${eyeSVG(z.hidden)}</button>`;
       el.onclick=()=>{S.selZone=z.id;S.selCam=null;renderLists();renderForms();drawAll();};
+      el.querySelector('.eye').onclick=e=>{e.stopPropagation(); z.hidden=!z.hidden; saveState(); renderLists(); renderForms(); drawAll();};
       zl.appendChild(el);
     }
     const cl=$('camList'); cl.innerHTML='';
     for(const c of S.cams){
       const z=S.zones.find(x=>x.id===c.zoneId);
       const el=document.createElement('div');
-      el.className='item'+(S.selCam===c.id?' sel':'');
-      el.innerHTML=`<span class="dot" style="background:${safeColor(c.color)}"></span><span class="nm">${esc(c.name)}</span><span class="sub">H${c.h.toFixed(1)} · ${lensOf(c)==='custom'?c.hf.toFixed(0)+'°':lensOf(c)+'mm'} · ${esc(z?z.name:'未分配')}</span>`;
+      el.className='item'+(S.selCam===c.id?' sel':'')+(c.hidden?' off':'');
+      el.innerHTML=`<span class="dot" style="background:${safeColor(c.color)}"></span><span class="nm">${esc(c.name)}</span><span class="sub">H${c.h.toFixed(1)} · ${lensOf(c)==='custom'?c.hf.toFixed(0)+'°':lensOf(c)+'mm'} · ${esc(z?z.name:'未分配')}</span><button class="eye${c.hidden?' off':''}" title="${c.hidden?'显示':'隐藏'}" aria-label="${c.hidden?'显示':'隐藏'}">${eyeSVG(c.hidden)}</button>`;
       el.onclick=()=>{S.selCam=c.id;S.selZone=null;renderLists();renderForms();drawAll();};
+      el.querySelector('.eye').onclick=e=>{e.stopPropagation(); c.hidden=!c.hidden; saveState(); renderLists(); renderForms(); drawAll();};
       cl.appendChild(el);
     }
     $('delCam').disabled=!S.selCam;
     $('delZone').disabled=!S.selZone;
+    $('showCams').disabled=!S.cams.some(c=>c.hidden);
+    $('showZones').disabled=!S.zones.some(z=>z.hidden);
   }
   function lensOf(c){
     for(const f of Object.keys(LENS)){
@@ -326,11 +341,13 @@
         <label>高 px<input data-k="ph" type="number" step="8" value="${c.ph}"></label>
         <label>颜色<input data-k="color" type="color" value="${safeColor(c.color)}"></label>
         <label>镜头<select data-lens>${Object.keys(LENS).map(f=>`<option value="${f}" ${lensOf(c)===f?'selected':''}>${f} mm</option>`).join('')}<option value="custom" ${lensOf(c)==='custom'?'selected':''}>自定义</option></select></label>
+        <label class="full chk"><input data-k="hidden" type="checkbox" ${c.hidden?'checked':''}> 在画布中隐藏</label>
       </div>`;
       cf.querySelectorAll('[data-k]').forEach(inp=>{
         inp.oninput=()=>{
           const k=inp.dataset.k;
-          c[k]= (k==='name'||k==='zoneId'||k==='color') ? inp.value : (+inp.value||0);
+          if(k==='hidden') c.hidden=inp.checked;
+          else c[k]= (k==='name'||k==='zoneId'||k==='color') ? inp.value : (+inp.value||0);
           const sel=cf.querySelector('[data-lens]');
           if(sel) sel.value=lensOf(c);
           saveState(); renderLists(); drawAll();
@@ -353,11 +370,13 @@
         <label>长<input data-zk="w" type="number" step="0.1" value="${z.w}"></label>
         <label>宽<input data-zk="h" type="number" step="0.1" value="${z.h}"></label>
         <label>颜色<input data-zk="color" type="color" value="${safeColor(z.color,'#d97706')}"></label>
+        <label class="full chk"><input data-zk="hidden" type="checkbox" ${z.hidden?'checked':''}> 在画布中隐藏</label>
       </div>`;
       zf.querySelectorAll('[data-zk]').forEach(inp=>{
         inp.oninput=()=>{
           const k=inp.dataset.zk;
-          z[k]= (k==='name'||k==='color') ? inp.value : (+inp.value||0);
+          if(k==='hidden') z.hidden=inp.checked;
+          else z[k]= (k==='name'||k==='color') ? inp.value : (+inp.value||0);
           saveState(); renderLists(); drawAll();
         };
       });
@@ -481,7 +500,7 @@
       <table><thead><tr><th>监控区</th><th>面积</th><th>覆盖</th><th>重叠</th></tr></thead><tbody>
       ${rows.map(r=>`<tr><td>${esc(r.name)}</td><td>${r.area.toFixed(1)} ㎡</td><td><span class="tag ${r.cov>0.95?'t-ok':r.cov>0.5?'t-part':'t-none'}">${(r.cov*100).toFixed(0)}%</span></td><td>${(r.ov*100).toFixed(0)}%</td></tr>`).join('')}
       </tbody></table>
-      <div class="hint">按 ${step} m 网格采样；覆盖率=被任意相机看到的面积/监控区面积。</div>`;
+      <div class="hint">按 ${step} m 网格采样；覆盖率=被任意相机看到的面积/监控区面积。隐藏项仅影响画布显示，仍计入指标。</div>`;
   }
 
   function drawAll(){ fit3(); fitP(); draw3D(); drawPlan(); metrics(); }
@@ -651,7 +670,7 @@
       return {id, name:String(z.name||('区 '+(i+1))).slice(0,60),
         x0:num(z.x0,-1e4,1e4,0), y0:num(z.y0,-1e4,1e4,0),
         w:num(z.w,0.1,1e4,4), h:num(z.h,0.1,1e4,3),
-        color:safeColor(z.color,'#d97706')};
+        color:safeColor(z.color,'#d97706'), hidden:!!z.hidden};
     });
     const cids=new Set();
     const cams=d.cams.map((c,i)=>{
@@ -662,7 +681,7 @@
         hf:num(c.hf,5,170,70), vf:num(c.vf,3,150,35),
         pw:Math.round(num(c.pw,320,8192,2560)), ph:Math.round(num(c.ph,240,4320,1440)),
         yaw:num(c.yaw,-720,720,0), pitch:num(c.pitch,0,90,30), roll:num(c.roll,-720,720,0),
-        zoneId:zids.has(zid)?zid:'auto', color:safeColor(c.color)};
+        zoneId:zids.has(zid)?zid:'auto', color:safeColor(c.color), hidden:!!c.hidden};
     });
     return {mppW:num(d.mppW,0.2,5000,14.5), mpp:num(d.mpp,0.00001,2,0.01),
       imgX:num(d.imgX,-1e5,1e5,0), imgY:num(d.imgY,-1e5,1e5,0), zones, cams, image:d.image};
@@ -703,6 +722,14 @@
     };
     rd.readAsText(f);
     e.target.value='';
+  };
+  $('showCams').onclick=()=>{
+    for(const c of S.cams) c.hidden=false;
+    saveState(); renderLists(); renderForms(); drawAll();
+  };
+  $('showZones').onclick=()=>{
+    for(const z of S.zones) z.hidden=false;
+    saveState(); renderLists(); renderForms(); drawAll();
   };
   $('autoAssign').onclick=autoAssign;
   $('optimize').onclick=optimizeAll;

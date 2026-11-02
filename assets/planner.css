@@ -33,6 +33,13 @@ button.accent:hover{color:#fff;filter:brightness(1.05)}
 .item .dot{width:9px;height:9px;border-radius:50%;flex:none}
 .item .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .item .sub{color:var(--muted);font-size:11px}
+.item.off{opacity:.55;background:#f8fafc}
+.item.off .nm{text-decoration:line-through}
+.item .eye{flex:none;width:20px;height:20px;padding:0;border:0;border-radius:4px;background:transparent;color:#94a3b8;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.item .eye:hover{color:var(--accent);background:#eef2f7}
+.item .eye.off{color:#cbd5e1}
+.form label.chk{display:flex;align-items:center;gap:6px;color:var(--text);font-size:12px}
+.form label.chk input{width:auto;margin:0}
 .form{margin-top:8px;padding:9px;border:1px dashed var(--line);border-radius:9px;background:#fbfcfe}
 .form .grid{display:grid;grid-template-columns:1fr 1fr;gap:6px}
 .form label{font-size:11px;color:var(--muted);display:block}

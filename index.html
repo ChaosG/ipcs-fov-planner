@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>多相机监控规划器</title>
-<link rel="stylesheet" href="assets/planner.css?v=5">
+<link rel="stylesheet" href="assets/planner.css?v=6">
 </head>
 <body>
 <header>
@@ -34,6 +34,7 @@
       <div class="btns">
         <button id="addZone" class="primary">＋ 画监控区</button>
         <button id="delZone">删除选中</button>
+        <button id="showZones" disabled>全部显示</button>
       </div>
       <div id="zoneList" class="list"></div>
       <div id="zoneForm" class="form hidden"></div>
@@ -44,6 +45,7 @@
       <div class="btns">
         <button id="addCam" class="primary">＋ 放相机</button>
         <button id="delCam">删除选中</button>
+        <button id="showCams" disabled>全部显示</button>
       </div>
       <div id="camList" class="list"></div>
       <div id="camForm" class="form hidden"></div>
@@ -76,6 +78,7 @@
         <li>监控区：点「＋ 画监控区」，在平面图上拖出矩形。</li>
         <li>相机：点「＋ 放相机」，在平面图上点击放置；拖动相机点可移动，或改 X/Y 坐标。</li>
         <li>选中：点平面图上的相机/区，或点左侧列表；选中后可改参数或删除。</li>
+        <li>隐藏：点列表右侧眼睛按钮，隐藏项只从画布消失，仍计入指标；「全部显示」一键恢复。</li>
         <li>3D：左键旋转、右键/Shift+左键平移、滚轮缩放；右上角「重置视角」。</li>
         <li>计算：先「自动分配区」，再「自动寻优」。</li>
       </ul>
@@ -100,6 +103,6 @@
 </div>
 
 <script src="assets/geometry.js?v=2"></script>
-<script src="assets/planner.js?v=34"></script>
+<script src="assets/planner.js?v=35"></script>
 </body>
 </html>

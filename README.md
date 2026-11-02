@@ -62,6 +62,7 @@ python3 -m http.server 8080
 
 - 平面图：左键选中/放置/拖动；右键、中键或 Shift+左键平移；滚轮以鼠标位置缩放；右上角「重置」恢复适配。
 - 3D：左键旋转、右键/中键/Shift+左键平移、滚轮缩放；右上角「重置视角」。
+- 隐藏：列表右侧眼睛按钮隐藏相机或监控区，只影响画布显示，仍计入覆盖指标；「全部显示」一键恢复。
 
 ## 模型说明
 
@@ -79,8 +80,8 @@ ipcs-fov-planner/
 ├── simulator.html      # 单相机模拟器
 ├── planner.html        # 兼容旧链接的跳转页
 ├── assets/
-│   ├── planner.css / planner.js
 │   ├── geometry.js     # 公共几何/投影（两页共用）
+│   ├── planner.css / planner.js
 │   └── style.css / app.js
 ├── docs/               # README 截图
 ├── pictures/           # 示例户型图
