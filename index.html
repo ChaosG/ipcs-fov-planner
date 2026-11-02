@@ -4,12 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>多相机监控规划器</title>
-<link rel="stylesheet" href="assets/planner.css?v=6">
+<link rel="stylesheet" href="assets/planner.css?v=7">
 </head>
 <body>
 <header>
   <h1>多相机监控规划器</h1>
-  <p>载入户型图 → 放置相机与监控区 → 自动分配、自动寻优，查看覆盖与盲区。3D：左键旋转、右键/Shift+左键平移、滚轮缩放。</p>
+  <p>载入户型图 → 放置相机与监控区 → 自动分配、单机寻优，查看覆盖与盲区。3D：左键旋转、右键/Shift+左键平移、滚轮缩放。</p>
   <a class="navlink" href="simulator.html">单相机模拟器 →</a>
 </header>
 
@@ -55,7 +55,7 @@
       <h2>计算</h2>
       <div class="btns">
         <button id="autoAssign">自动分配区</button>
-        <button id="optimize" class="accent">自动寻优</button>
+        <button id="optimize" class="accent">优化选中相机</button>
       </div>
       <div class="hint" id="optMsg"></div>
     </section>
@@ -80,7 +80,7 @@
         <li>选中：点平面图上的相机/区，或点左侧列表；选中后可改参数或删除。</li>
         <li>隐藏：点列表右侧眼睛按钮，隐藏项只从画布消失，仍计入指标；「全部显示」一键恢复。</li>
         <li>3D：左键旋转、右键/Shift+左键平移、滚轮缩放；右上角「重置视角」。</li>
-        <li>计算：先「自动分配区」，再「自动寻优」。</li>
+        <li>计算：先「自动分配区」；选中一台相机后点「优化选中相机」，只优化该相机。</li>
       </ul>
     </details>
   </aside>
@@ -103,6 +103,6 @@
 </div>
 
 <script src="assets/geometry.js?v=2"></script>
-<script src="assets/planner.js?v=37"></script>
+<script src="assets/planner.js?v=44"></script>
 </body>
 </html>

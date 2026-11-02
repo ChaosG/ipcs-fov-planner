@@ -304,7 +304,7 @@
       const z=S.zones.find(x=>x.id===c.zoneId);
       const el=document.createElement('div');
       el.className='item'+(S.selCam===c.id?' sel':'')+(c.hidden?' off':'');
-      el.innerHTML=`<span class="dot" style="background:${safeColor(c.color)}"></span><span class="nm">${esc(c.name)}</span><span class="sub">H${c.h.toFixed(1)} · ${lensOf(c)==='custom'?c.hf.toFixed(0)+'°':lensOf(c)+'mm'} · ${esc(z?z.name:'未分配')}</span><button class="eye${c.hidden?' off':''}" title="${c.hidden?'显示':'隐藏'}" aria-label="${c.hidden?'显示':'隐藏'}">${eyeSVG(c.hidden)}</button>`;
+      el.innerHTML=`<span class="dot" style="background:${safeColor(c.color)}"></span><span class="nm">${esc(c.name)}</span><span class="sub">H${c.h.toFixed(1)} · ${lensOf(c)==='custom'?'自定义('+c.hf.toFixed(0)+'°)':lensOf(c)+'mm'} · ${esc(z?z.name:'未分配')}</span><button class="eye${c.hidden?' off':''}" title="${c.hidden?'显示':'隐藏'}" aria-label="${c.hidden?'显示':'隐藏'}">${eyeSVG(c.hidden)}</button>`;
       el.onclick=()=>{S.selCam=c.id;S.selZone=null;renderLists();renderForms();drawAll();};
       el.querySelector('.eye').onclick=e=>{e.stopPropagation(); c.hidden=!c.hidden; saveState(); renderLists(); renderForms(); drawAll();};
       cl.appendChild(el);
@@ -315,6 +315,11 @@
     $('showZones').disabled=!S.zones.some(z=>z.hidden);
   }
   function lensOf(c){
+    if(c.lens==='custom') return 'custom';
+    if(c.lens && LENS[c.lens]){
+      const [h,v]=LENS[c.lens];
+      if(Math.abs(c.hf-h)<0.6 && Math.abs(c.vf-v)<0.6) return c.lens;
+    }
     for(const f of Object.keys(LENS)){
       const [h,v]=LENS[f];
       if(Math.abs(c.hf-h)<0.6 && Math.abs(c.vf-v)<0.6) return f;
@@ -348,6 +353,10 @@
           const k=inp.dataset.k;
           if(k==='hidden') c.hidden=inp.checked;
           else c[k]= (k==='name'||k==='zoneId'||k==='color') ? inp.value : (+inp.value||0);
+          if((k==='hf'||k==='vf') && c.lens && c.lens!=='custom'){
+            const l=LENS[c.lens];
+            if(!l || Math.abs(c.hf-l[0])>=0.6 || Math.abs(c.vf-l[1])>=0.6) c.lens='custom';
+          }
           const sel=cf.querySelector('[data-lens]');
           if(sel) sel.value=lensOf(c);
           saveState(); renderLists(); drawAll();
@@ -355,8 +364,9 @@
       });
       cf.querySelector('[data-lens]').onchange=e=>{
         const f=e.target.value;
-        if(f!=='custom'){ const [h,v]=LENS[f]; c.hf=h; c.vf=v; }
-        saveState(); renderForms(); drawAll();
+        if(f==='custom') c.lens='custom';
+        else { const [h,v]=LENS[f]; c.hf=h; c.vf=v; c.lens=f; }
+        saveState(); renderLists(); renderForms(); drawAll();
       };
     }
     const zf=$('zoneForm'), z=S.zones.find(x=>x.id===S.selZone);
@@ -387,7 +397,7 @@
   function addCamAt(x,y){
     const n=S.cams.length;
     const c={id:'c'+nextCam++, name:'C'+nextCam, x,y, h:3, hf:70, vf:35, pw:2560, ph:1440,
-             yaw:0, pitch:30, roll:0, zoneId:'auto', color:COLORS[n%COLORS.length]};
+             yaw:0, pitch:30, roll:0, zoneId:'auto', color:COLORS[n%COLORS.length], lens:'4'};
     c.name='C'+(S.cams.length+1);
     S.cams.push(c); S.selCam=c.id; S.selZone=null;
     saveState(); renderLists(); renderForms(); drawAll();
@@ -418,51 +428,76 @@
     saveState(); renderLists(); renderForms(); drawAll();
     $('optMsg').textContent='已按最近距离自动分配监控区（可手动改）';
   }
-  function optimizeAll(){
+  function optimizeSelected(){
+    const c=S.cams.find(x=>x.id===S.selCam);
+    if(!c){ $('optMsg').textContent='请先在列表或平面图中选中一台相机'; return; }
     if(!S.zones.length){ $('optMsg').textContent='请先画监控区'; return; }
     $('optMsg').textContent='计算中…';
     setTimeout(()=>{
-      let done=0;
-      for(const c of S.cams){
-        let z=S.zones.find(x=>x.id===c.zoneId);
-        if(!z){
-          let best=null,bestD=Infinity;
-          for(const zz of S.zones){ const d=distToZone(c,zz); if(d<bestD){bestD=d;best=zz;} }
-          z=best; if(!z) continue; c.zoneId=z.id;
+      let z=S.zones.find(x=>x.id===c.zoneId);
+      if(!z){
+        let best=null,bestD=Infinity;
+        for(const zz of S.zones){ const d=distToZone(c,zz); if(d<bestD){bestD=d;best=zz;} }
+        z=best; if(!z){ $('optMsg').textContent='没有可用的监控区'; return; }
+        c.zoneId=z.id;
+      }
+      const r=zoneRect(z), zA=((r[2]-r[0])*(r[3]-r[1]))||1;
+      const test=(yaw,pitch,roll)=>{
+        const cc={...c,yaw,pitch,roll};
+        const fp=footprint(cc); if(!fp) return null;
+        const inter=clipPoly(fp,r);
+        const interA=inter.length>2?polyArea(inter):0;
+        const fpA=polyArea(fp);
+        const cov=interA/zA;
+        // 视界利用率：监控区内覆盖面积 / 地面足迹面积
+        const ratio=fpA>1e-9?Math.min(1,interA/fpA):0;
+        return {cov,ratio,area:fpA};
+      };
+      // 覆盖率优先；覆盖率相同（含 100%）时，视界利用率越高越好
+      const better=(t,b)=>!b || t.cov>b.cov+1e-6 ||
+        (Math.abs(t.cov-b.cov)<=1e-6 && t.ratio>b.ratio+1e-9);
+      // 粗扫：记录所有可行姿态
+      const all=[];
+      for(let yaw=0;yaw<360;yaw+=6)
+        for(let pitch=1;pitch<=89;pitch+=2.5)
+          for(let roll=0;roll<360;roll+=15){
+            const t=test(yaw,pitch,roll); if(!t) continue;
+            all.push({yaw,pitch,roll,...t});
+          }
+      let best=null;
+      if(all.length){
+        const topCov=all.reduce((a,b)=>b.cov>a.cov?b:a);
+        const maxCov=topCov.cov;
+        // 候选带：覆盖率接近最高值，按视界利用率排序，取彼此分散的起点
+        const cands=all.filter(t=>t.cov>=maxCov-1e-3).sort((a,b)=>b.ratio-a.ratio);
+        const picks=[];
+        for(const s of cands){
+          if(picks.length>=6) break;
+          if(picks.every(p=>Math.abs(((p.yaw-s.yaw+540)%360)-180)>=15)) picks.push(s);
         }
-        const r=zoneRect(z), zA=((r[2]-r[0])*(r[3]-r[1]))||1;
-        const test=(yaw,pitch,roll)=>{
-          const cc={...c,yaw,pitch,roll};
-          const fp=footprint(cc); if(!fp) return null;
-          const inter=clipPoly(fp,r);
-          const cov=inter.length>2?polyArea(inter)/zA:0;
-          return {cov,area:polyArea(fp)};
-        };
-        let best=null;
-        for(let yaw=0;yaw<360;yaw+=6)
-          for(let pitch=1;pitch<=89;pitch+=2.5)
-            for(let roll=0;roll<360;roll+=15){
-              const t=test(yaw,pitch,roll); if(!t) continue;
-              if(!best || t.cov>best.cov+1e-6 || (Math.abs(t.cov-best.cov)<1e-6 && t.area<best.area))
-                best={yaw,pitch,roll,...t};
-            }
-        if(best){
-          const b0={...best};
+        if(!picks.some(p=>p===topCov)) picks.push(topCov);
+        // 多起点局部细化
+        for(const s of picks){
+          const b0={...s};
+          let b={...s};
           for(let yaw=b0.yaw-6;yaw<=b0.yaw+6;yaw+=0.5)
             for(let pitch=Math.max(0.5,b0.pitch-2.5);pitch<=Math.min(89.5,b0.pitch+2.5);pitch+=0.25)
               for(let roll=b0.roll-15;roll<=b0.roll+15;roll+=1){
                 const t=test(yaw,pitch,roll); if(!t) continue;
-                if(t.cov>best.cov+1e-6 || (Math.abs(t.cov-best.cov)<1e-6 && t.area<best.area))
-                  best={yaw,pitch,roll,...t};
+                if(better(t,b)) b={yaw,pitch,roll,...t};
               }
-          c.yaw=((best.yaw%360)+360)%360;
-          c.pitch=best.pitch;
-          c.roll=((best.roll%360)+360)%360;
-          done++;
+          if(better(b,best)) best=b;
         }
       }
-      saveState(); renderLists(); renderForms(); drawAll();
-      $('optMsg').textContent=`已优化 ${done} 台相机`;
+      if(best){
+        c.yaw=((best.yaw%360)+360)%360;
+        c.pitch=best.pitch;
+        c.roll=((best.roll%360)+360)%360;
+        saveState(); renderLists(); renderForms(); drawAll();
+        $('optMsg').textContent=`已优化「${c.name}」：覆盖 ${(best.cov*100).toFixed(0)}% · 视界利用率 ${(best.ratio*100).toFixed(0)}%`;
+      } else {
+        $('optMsg').textContent=`「${c.name}」无法覆盖「${z.name}」`;
+      }
     },30);
   }
 
@@ -490,17 +525,38 @@
       rows.push({name:z.name,area,cov:tot?cov/tot:0,ov:tot?ov/tot:0});
     }
     const pct=totalA?coveredA/totalA:0;
+    // 视界利用率：区内覆盖面积 / 地面足迹面积。选中相机时看该相机，否则看全部加权值。
+    const utilOf=c=>{
+      const fp=footprint(c); if(!fp) return null;
+      const fpA=polyArea(fp);
+      let z=S.zones.find(x=>x.id===c.zoneId);
+      if(!z){
+        let bd=Infinity;
+        for(const zz of S.zones){ const d=distToZone(c,zz); if(d<bd){ bd=d; z=zz; } }
+      }
+      if(!z) return {cov:0,fp:fpA};
+      const inter=clipPoly(fp,zoneRect(z));
+      return {cov:Math.min(fpA,inter.length>2?polyArea(inter):0),fp:fpA};
+    };
+    const selCam=S.cams.find(c=>c.id===S.selCam);
+    let uCov=0,uFp=0;
+    for(const c of (selCam?[selCam]:S.cams)){
+      const u=utilOf(c); if(!u) continue;
+      uCov+=u.cov; uFp+=u.fp;
+    }
+    const util=uFp>1e-9?uCov/uFp:0;
     box.innerHTML=`<h3>覆盖指标</h3>
       <div class="kpi">
         <div>监控区总面积<b>${totalA.toFixed(1)} ㎡</b></div>
         <div>已覆盖<b>${coveredA.toFixed(1)} ㎡</b></div>
         <div>覆盖率<b>${(pct*100).toFixed(0)}%</b></div>
+        <div>视界利用率<b>${(util*100).toFixed(0)}%</b></div>
         <div>重叠面积<b>${overA.toFixed(1)} ㎡</b></div>
       </div>
       <table><thead><tr><th>监控区</th><th>面积</th><th>覆盖</th><th>重叠</th></tr></thead><tbody>
       ${rows.map(r=>`<tr><td>${esc(r.name)}</td><td>${r.area.toFixed(1)} ㎡</td><td><span class="tag ${r.cov>0.95?'t-ok':r.cov>0.5?'t-part':'t-none'}">${(r.cov*100).toFixed(0)}%</span></td><td>${(r.ov*100).toFixed(0)}%</td></tr>`).join('')}
       </tbody></table>
-      <div class="hint">按 ${step} m 网格采样；覆盖率=被任意相机看到的面积/监控区面积。隐藏项仅影响画布显示，仍计入指标。</div>`;
+      <div class="hint">按 ${step} m 网格采样；覆盖率=被任意相机看到的面积/监控区面积。视界利用率=区内覆盖面积/地面足迹面积（选中相机时看该相机，否则为全部加权）。隐藏项仅影响画布显示，仍计入指标。</div>`;
   }
 
   function drawAll(){ fit3(); fitP(); draw3D(); drawPlan(); metrics(); }
@@ -679,7 +735,8 @@
         hf:num(c.hf,5,170,70), vf:num(c.vf,3,150,35),
         pw:Math.round(num(c.pw,320,8192,2560)), ph:Math.round(num(c.ph,240,4320,1440)),
         yaw:num(c.yaw,-720,720,0), pitch:num(c.pitch,0,90,30), roll:num(c.roll,-720,720,0),
-        zoneId:zids.has(zid)?zid:'auto', color:safeColor(c.color), hidden:!!c.hidden};
+        zoneId:zids.has(zid)?zid:'auto', color:safeColor(c.color), hidden:!!c.hidden,
+        lens:['2.8','4','6','8','custom'].includes(String(c.lens))?String(c.lens):undefined};
     });
     return {mppW:num(d.mppW,0.2,5000,14.5), mpp:num(d.mpp,0.00001,2,0.01),
       imgX:num(d.imgX,-1e5,1e5,0), imgY:num(d.imgY,-1e5,1e5,0), zones, cams, image:d.image};
@@ -730,7 +787,7 @@
     saveState(); renderLists(); renderForms(); drawAll();
   };
   $('autoAssign').onclick=autoAssign;
-  $('optimize').onclick=optimizeAll;
+  $('optimize').onclick=optimizeSelected;
 
   cp.addEventListener('pointerdown',e=>{
     if(e.button===2||e.button===1||e.shiftKey){
